@@ -6,11 +6,18 @@ MODULE DB
   ! ------------------------------------------------------------------
   !  PostgreSQL result statuses
   ! ------------------------------------------------------------------
-  INTEGER, PARAMETER :: PGRES_COMMAND_OK = 1
-  INTEGER, PARAMETER :: PGRES_TUPLES_OK  = 2
-
+  INTEGER(C_INT), PARAMETER :: PGRES_EMPTY_QUERY = 0
+  INTEGER(C_INT), PARAMETER :: PGRES_COMMAND_OK = 1
+  INTEGER(C_INT), PARAMETER :: PGRES_TUPLES_OK  = 2
+  INTEGER(C_INT), PARAMETER :: PGRES_COPY_OUT = 3
+  INTEGER(C_INT), PARAMETER :: PGRES_COPY_IN = 4
+  INTEGER(C_INT), PARAMETER :: PGRES_BAD_RESPONSE = 5
+  INTEGER(C_INT), PARAMETER :: PGRES_NONFATAL_ERROR = 6
+  INTEGER(C_INT), PARAMETER :: PGRES_FATAL_ERROR = 7
+  
   ! PostgreSQL connection statuses
-  INTEGER, PARAMETER :: CONNECTION_OK    = 0
+  INTEGER(C_INT), PARAMETER :: CONNECTION_OK = 0
+  INTEGER(C_INT), PARAMETER :: CONNECTION_BAD = 1
 
   ! We'll store the DB connection handle here
   TYPE(C_PTR) :: connPtr = C_NULL_PTR
