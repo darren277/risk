@@ -266,7 +266,8 @@ CONTAINS
     CHARACTER(KIND=C_CHAR, LEN=256) :: conninfo
     CHARACTER(LEN=256)             :: errmsg
 
-    conninfo = 'host=localhost dbname=risk user=myuser password=mypass' // C_NULL_CHAR
+    ! TODO: Use environment variables for connection info
+    conninfo = 'host=localhost dbname=risk user=myusername password=mypassword' // C_NULL_CHAR
 
     connPtr = PQconnectdb(conninfo)
 
