@@ -348,13 +348,20 @@ CONTAINS
 
     ! Convert each field to a C-string representation
     s_name  = loan%name
-    WRITE(s_pastDebts,      '(g0)') loan%pastDebts
-    WRITE(s_paymentHistory, '(g0)') loan%paymentHistory
-    WRITE(s_currentIncome,  '(g0)') loan%currentIncome
-    WRITE(s_timeAtCurrentJob,'(g0)')loan%timeAtCurrentJob
-    WRITE(s_creditUtil,     '(g0)') loan%creditUtilization
-    WRITE(s_openAccounts,   '(i0)') loan%numberOfOpenAccounts
-    WRITE(s_riskFactor,     '(g0)') loan%riskFactor
+    WRITE(s_pastDebts,      '(F0.2)') loan%pastDebts
+    s_pastDebts = TRIM(s_pastDebts) // C_NULL_CHAR
+    WRITE(s_paymentHistory, '(F0.2)') loan%paymentHistory
+    s_paymentHistory = TRIM(s_paymentHistory) // C_NULL_CHAR
+    WRITE(s_currentIncome,  '(F0.2)') loan%currentIncome
+    s_currentIncome = TRIM(s_currentIncome) // C_NULL_CHAR
+    WRITE(s_timeAtCurrentJob,'(F0.2)') loan%timeAtCurrentJob
+    s_timeAtCurrentJob = TRIM(s_timeAtCurrentJob) // C_NULL_CHAR
+    WRITE(s_creditUtil,     '(F0.3)') loan%creditUtilization
+    s_creditUtil = TRIM(s_creditUtil) // C_NULL_CHAR
+    WRITE(s_openAccounts,   '(I0)') loan%numberOfOpenAccounts
+    s_openAccounts = TRIM(s_openAccounts) // C_NULL_CHAR
+    WRITE(s_riskFactor,     '(F0.2)') loan%riskFactor
+    s_riskFactor = TRIM(s_riskFactor) // C_NULL_CHAR
 
     WRITE(*, '(A)') "[DEBUG] Param values:"
     WRITE(*, '(A)') "  name: " // TRIM(s_name)
