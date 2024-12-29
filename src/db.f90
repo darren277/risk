@@ -317,7 +317,26 @@ CONTAINS
     CHARACTER(KIND=C_CHAR, LEN=50), TARGET :: s_name, s_pastDebts, s_paymentHistory
     CHARACTER(KIND=C_CHAR, LEN=50), TARGET :: s_currentIncome, s_timeAtCurrentJob
     CHARACTER(KIND=C_CHAR, LEN=50), TARGET :: s_creditUtil, s_openAccounts, s_riskFactor
-    TYPE(C_PTR), DIMENSION(8)      :: paramValues
+    TYPE(C_PTR), DIMENSION(8), TARGET      :: paramValues
+    INTEGER                                :: i
+    TYPE(C_PTR) :: valuePtr
+    CHARACTER(LEN=256) :: tempStr
+    INTEGER :: ios
+
+    ! At the start of dbInsertLoan
+    IF (.NOT. C_ASSOCIATED(connPtr)) THEN
+      WRITE(*, '(A)') "[DEBUG] No database connection!"
+      outId = -1
+      RETURN
+    END IF
+
+    ! Check connection status
+    IF (PQstatus(connPtr) /= CONNECTION_OK) THEN
+      CALL cstr_to_fstr(PQerrorMessage(connPtr), errmsg)
+      WRITE(*, '(A)') "[DEBUG] Database connection is not OK: " // TRIM(errmsg)
+      outId = -1
+      RETURN
+    END IF
 
     ! Construct the SQL
     sql = 'INSERT INTO loans (name, past_debts, payment_history, current_income, time_at_current_job, ' // &
