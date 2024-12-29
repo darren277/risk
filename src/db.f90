@@ -385,26 +385,64 @@ CONTAINS
     
     WRITE(*, '(A)') "[DEBUG] Executing query..."
 
-    ! Execute query
-    resPtr = PQexecParams( connPtr, sql, 8,   &
-                           C_NULL_PTR,        &
-                           paramValues,       &
-                           C_NULL_PTR,        &
-                           C_NULL_PTR,        &
-                           0 )    ! 0 => text result
-
-    IF (PQresultStatus(resPtr) /= PGRES_TUPLES_OK) THEN
-      CALL getErrorMessage(connPtr, errmsg)
-      WRITE(*,*) 'Failed to insert loan: ', TRIM(errmsg)
-      outId = -1
-      CALL PQclear(resPtr)
-      RETURN
+    IF (C_ASSOCIATED(connPtr)) THEN
+      WRITE(*, '(A)') "[DEBUG] Connection pointer is valid"
+    ELSE
+        WRITE(*, '(A)') "[DEBUG] Connection pointer is NULL!"
+        RETURN
     END IF
 
-    WRITE(*, '(A,I0)') "[DEBUG] Query result status: ", PQresultStatus(resPtr)
+    ! Print the exact SQL being executed
+    WRITE(*, '(A)') "[DEBUG] SQL: " // TRIM(sql)
 
-    ! Return the newly generated ID
-    outId = cPtrToInt( PQgetvalue(resPtr, 0, 0) )
+    WRITE(*, '(A)') "[DEBUG] About to debug pointers..."
+
+    ! After setting up paramValues array
+    DO i = 1, 8
+        IF (C_ASSOCIATED(paramValues(i))) THEN
+            WRITE(*, '(A,I0,A)') "[DEBUG] Param ", i, " pointer is valid"
+        ELSE
+            WRITE(*, '(A,I0,A)') "[DEBUG] Param ", i, " pointer is NULL"
+        END IF
+    END DO
+
+    WRITE(*, '(A)') "[DEBUG] paramValues array location: ", C_LOC(paramValues)
+
+    WRITE(*, '(A)') "[DEBUG] About to call PQexecParams..."
+
+    ! Execute query
+    resPtr = PQexecParams(connPtr, sql, 8, &
+                      C_NULL_PTR,      &  ! Let server infer types
+                      paramValues,     &
+                      C_NULL_PTR,      &  ! Not needed for text
+                      C_NULL_PTR,      &  ! Default to text format
+                      0)               ! Text results
+    
+    CALL handlePGresult(resPtr, connPtr, errmsg, outId)
+    IF (outId == -1) RETURN
+
+    !WRITE(*, '(A,I0)') "[DEBUG] Query result status: ", PQresultStatus(resPtr)
+
+    WRITE(*, '(A)') "[DEBUG] Inserted loan successfully!"
+
+    valuePtr = PQgetvalue(resPtr, 0, 0)
+    WRITE(*, '(A)') "[DEBUG] Got value pointer"
+
+    IF (C_ASSOCIATED(valuePtr)) THEN
+      ! Convert the returned string value to integer safely
+      CALL cstr_to_fstr(valuePtr, tempStr)
+      WRITE(*, '(A)') "[DEBUG] Value string: " // TRIM(tempStr)
+      READ(tempStr, *, IOSTAT=ios) outId
+      IF (ios /= 0) THEN
+          WRITE(*, '(A)') "[DEBUG] Failed to convert ID to integer"
+          outId = -1
+      END IF
+    ELSE
+      WRITE(*, '(A)') "[DEBUG] Value pointer is NULL"
+      outId = -1
+    END IF
+
+    WRITE(*, '(A,I0)') "[DEBUG] Inserted with ID: ", outId
 
     CALL PQclear(resPtr)
   END SUBROUTINE dbInsertLoan
