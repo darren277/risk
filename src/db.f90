@@ -429,7 +429,6 @@ CONTAINS
     WRITE(*, '(A)') "[DEBUG] Got value pointer"
 
     IF (C_ASSOCIATED(valuePtr)) THEN
-      ! Convert the returned string value to integer safely
       CALL cstr_to_fstr(valuePtr, tempStr)
       WRITE(*, '(A)') "[DEBUG] Value string: " // TRIM(tempStr)
       READ(tempStr, *, IOSTAT=ios) outId
@@ -444,7 +443,9 @@ CONTAINS
 
     WRITE(*, '(A,I0)') "[DEBUG] Inserted with ID: ", outId
 
+    WRITE(*, '(A)') "[DEBUG] About to clear result..."
     CALL PQclear(resPtr)
+    WRITE(*, '(A)') "[DEBUG] Result cleared"
   END SUBROUTINE dbInsertLoan
 
   ! ------------------------------------------------------------------
