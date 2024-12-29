@@ -31,9 +31,10 @@ MODULE DB
       CHARACTER(KIND=C_CHAR), INTENT(IN) :: conninfo(*)
     END FUNCTION PQconnectdb
 
-    INTEGER(C_INT) FUNCTION PQstatus(conn) BIND(C, NAME="PQstatus")
-      IMPORT :: C_PTR, C_INT
-      TYPE(C_PTR), INTENT(IN) :: conn
+    FUNCTION PQstatus(conn) BIND(C, NAME="PQstatus")
+      IMPORT C_PTR, C_INT
+      TYPE(C_PTR), VALUE :: conn
+      INTEGER(C_INT) :: PQstatus
     END FUNCTION PQstatus
 
     SUBROUTINE PQfinish(conn) BIND(C, NAME="PQfinish")
@@ -42,9 +43,9 @@ MODULE DB
     END SUBROUTINE PQfinish
 
     FUNCTION PQerrorMessage(conn) BIND(C, NAME="PQerrorMessage")
-      IMPORT :: C_PTR
+      IMPORT C_PTR
+      TYPE(C_PTR), VALUE :: conn
       TYPE(C_PTR) :: PQerrorMessage
-      TYPE(C_PTR), INTENT(IN) :: conn
     END FUNCTION PQerrorMessage
 
     TYPE(C_PTR) FUNCTION PQexec(conn, query) BIND(C, NAME="PQexec")
@@ -53,23 +54,23 @@ MODULE DB
       CHARACTER(KIND=C_CHAR), INTENT(IN) :: query(*)
     END FUNCTION PQexec
 
-    TYPE(C_PTR) FUNCTION PQexecParams(conn, query, nParams, paramTypes, paramValues, &
+    TYPE(C_PTR) FUNCTION PQexecParams(conn, command, nParams, paramTypes, paramValues, &
                                       paramLengths, paramFormats, resultFormat) &
                                       BIND(C, NAME="PQexecParams")
       IMPORT :: C_CHAR, C_INT, C_PTR
-      TYPE(C_PTR), INTENT(IN) :: conn
-      CHARACTER(KIND=C_CHAR), INTENT(IN) :: query(*)
+      TYPE(C_PTR), VALUE, INTENT(IN) :: conn
+      CHARACTER(KIND=C_CHAR), INTENT(IN) :: command(*)
       INTEGER(C_INT), VALUE :: nParams
-      TYPE(C_PTR), INTENT(IN) :: paramTypes(*)     ! or C_NULL_PTR
-      TYPE(C_PTR), INTENT(IN) :: paramValues(*)    ! array of param data pointers
-      TYPE(C_PTR), INTENT(IN) :: paramLengths(*)   ! or C_NULL_PTR
-      TYPE(C_PTR), INTENT(IN) :: paramFormats(*)   ! or C_NULL_PTR
+      TYPE(C_PTR), VALUE :: paramTypes
+      TYPE(C_PTR), VALUE :: paramValues
+      TYPE(C_PTR), VALUE :: paramLengths
+      TYPE(C_PTR), VALUE :: paramFormats
       INTEGER(C_INT), VALUE :: resultFormat
     END FUNCTION PQexecParams
 
     INTEGER(C_INT) FUNCTION PQresultStatus(result) BIND(C, NAME="PQresultStatus")
       IMPORT :: C_PTR, C_INT
-      TYPE(C_PTR), INTENT(IN) :: result
+      TYPE(C_PTR), VALUE :: result
     END FUNCTION PQresultStatus
 
     INTEGER(C_INT) FUNCTION PQntuples(result) BIND(C, NAME="PQntuples")
@@ -82,11 +83,11 @@ MODULE DB
       TYPE(C_PTR), INTENT(IN) :: result
     END SUBROUTINE PQclear
 
-    FUNCTION PQgetvalue(res, row_number, column_number) RESULT(rPtr) BIND(C, NAME="PQgetvalue")
-      IMPORT :: C_PTR, C_INT, C_CHAR
-      TYPE(C_PTR) :: rPtr
-      TYPE(C_PTR), INTENT(IN) :: res
-      INTEGER(C_INT), VALUE   :: row_number, column_number
+    FUNCTION PQgetvalue(res, tupno, field) BIND(C, NAME="PQgetvalue")
+      IMPORT C_PTR, C_INT
+      TYPE(C_PTR), VALUE :: res
+      INTEGER(C_INT), VALUE :: tupno, field
+      TYPE(C_PTR) :: PQgetvalue
     END FUNCTION PQgetvalue
   END INTERFACE
 
