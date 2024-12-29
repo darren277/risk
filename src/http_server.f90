@@ -7,6 +7,105 @@ MODULE HTTPServer
 
 CONTAINS
 
+  SUBROUTINE safeReplace(input, pattern, replacement, output)
+    IMPLICIT NONE
+    CHARACTER(*), INTENT(IN) :: input, pattern, replacement
+    CHARACTER(*), INTENT(OUT) :: output
+    INTEGER :: i, j, pLen, rLen
+    
+    pLen = LEN_TRIM(pattern)
+    rLen = LEN_TRIM(replacement)
+    j = 1
+    i = 1
+    
+    DO WHILE (i <= LEN_TRIM(input))
+        IF (i + pLen - 1 <= LEN_TRIM(input)) THEN
+            IF (input(i:i+pLen-1) == pattern) THEN
+                IF (j + rLen - 1 <= LEN(output)) THEN
+                    output(j:j+rLen-1) = replacement
+                    j = j + rLen
+                    i = i + pLen
+                    CYCLE
+                END IF
+            END IF
+        END IF
+        
+        IF (j <= LEN(output)) THEN
+            output(j:j) = input(i:i)
+            j = j + 1
+        END IF
+        i = i + 1
+    END DO
+    
+    IF (j <= LEN(output)) output(j:) = ' '
+  END SUBROUTINE safeReplace
+
+  SUBROUTINE safeParseRequestLine(line, method, path, version)
+    IMPLICIT NONE
+    CHARACTER(*), INTENT(IN) :: line
+    CHARACTER(*), INTENT(OUT) :: method, path, version
+    INTEGER :: pos1, pos2
+    
+    method = 'UNKNOWN'
+    path = '/'
+    version = ''
+    
+    pos1 = INDEX(line, ' ')
+    IF (pos1 <= 1 .OR. pos1 >= LEN_TRIM(line)) RETURN
+    
+    pos2 = INDEX(line(pos1+1:), ' ')
+    IF (pos2 <= 0) RETURN
+    pos2 = pos2 + pos1
+    
+    IF (pos1 <= LEN(method)) method = line(1:pos1-1)
+    IF (pos2-pos1-1 <= LEN(path)) path = line(pos1+1:pos2-1)
+    IF (LEN_TRIM(line) - pos2 <= LEN(version)) version = line(pos2+1:)
+  END SUBROUTINE safeParseRequestLine
+
+  SUBROUTINE safeExtractHeaderValue(headers, name, value)
+    IMPLICIT NONE
+    CHARACTER(*), INTENT(IN) :: headers, name
+    CHARACTER(*), INTENT(OUT) :: value
+    INTEGER :: start, end, valueStart
+    CHARACTER(LEN=:), ALLOCATABLE :: headerLine
+    
+    value = ''
+    headerLine = name // ':'
+    
+    start = INDEX(headers, headerLine)
+    IF (start <= 0) RETURN
+    
+    end = INDEX(headers(start:), NEW_LINE('A'))
+    IF (end <= 0) RETURN
+    end = start + end - 1
+    
+    valueStart = start + LEN_TRIM(headerLine)
+    IF (valueStart >= end) RETURN
+    
+    value = ADJUSTL(headers(valueStart:end-1))
+  END SUBROUTINE safeExtractHeaderValue
+
+  SUBROUTINE extractHeaderValue(headers, key, value)
+    IMPLICIT NONE
+    CHARACTER(*), INTENT(IN)  :: headers
+    CHARACTER(*), INTENT(IN)  :: key
+    CHARACTER(*), INTENT(OUT) :: value
+    INTEGER :: start, keyLength, end
+
+    keyLength = LEN_TRIM(key)
+
+    ! Locate the key in the headers
+    start = INDEX(headers, key // ":")
+    IF (start > 0) THEN
+      start = start + keyLength + 1  ! Move past "key:"
+      end = INDEX(headers(start:), NEW_LINE('A'))
+      IF (end == 0) end = LEN_TRIM(headers) + 1 - start
+      value = TRIM(headers(start:start + end - 2))
+    ELSE
+      value = ""
+    END IF
+  END SUBROUTINE extractHeaderValue
+
   SUBROUTINE replace(input, target, replacement, output)
     CHARACTER(*), INTENT(IN)  :: input       ! The input string
     CHARACTER(*), INTENT(IN)  :: target      ! The substring to replace
