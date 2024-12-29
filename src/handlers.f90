@@ -27,18 +27,30 @@ CONTAINS
     INTEGER          :: newId
     LOGICAL          :: parseSuccess
 
+    WRITE(*, '(A)') "[DEBUG] Starting loan creation"
+    WRITE(*, '(A)') "[DEBUG] Received body: "//TRIM(body)
+
     ! 1) Parse JSON body into a LoanRecord
     parseSuccess = parseLoanJSON(body, loan)
+    WRITE(*, '(A,L1)') "[DEBUG] JSON parse success: ", parseSuccess
+
     IF (.NOT. parseSuccess) THEN
       response = '{"error": "Invalid JSON"}'
       RETURN
     END IF
 
+    !WRITE(*, '(A,F10.2)') "[DEBUG] Parsed loan holders name: ", loan%name
+    WRITE(*, '(A)') "[DEBUG] Parsed loan holders name: " // TRIM(loan%name)
+
     ! 2) Calculate risk factor
     loan%riskFactor = computeLoanRisk(loan)
 
+    WRITE(*, '(A,F10.2)') "[DEBUG] Calculated risk factor: ", loan%riskFactor
+
     ! 3) Insert into DB
     CALL dbInsertLoan(loan, newId)
+    WRITE(*, '(A,I0)') "[DEBUG] Inserted with ID: ", newId
+
     loan%id = newId
 
     ! 4) Convert to JSON
