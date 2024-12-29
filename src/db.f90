@@ -106,6 +106,27 @@ CONTAINS
     END IF
   END FUNCTION isNullPtr
 
+  ! And add a helper function to convert C string to Fortran string
+  SUBROUTINE cstr_to_fstr(cptr, fstr)
+    TYPE(C_PTR), INTENT(IN) :: cptr
+    CHARACTER(*), INTENT(OUT) :: fstr
+    CHARACTER(KIND=C_CHAR), POINTER :: tmpc(:)
+    INTEGER :: i
+
+    IF (.NOT. C_ASSOCIATED(cptr)) THEN
+        fstr = ''
+        RETURN
+    END IF
+
+    CALL C_F_POINTER(cptr, tmpc, [HUGE(0)])
+    fstr = ''
+    i = 1
+    DO WHILE (tmpc(i) /= C_NULL_CHAR .AND. i <= LEN(fstr))
+        fstr(i:i) = tmpc(i)
+        i = i + 1
+    END DO
+  END SUBROUTINE
+
   ! ------------------------------------------------------------------
   ! 2) Helper: copy a C-string into a Fortran CHARACTER
   ! ------------------------------------------------------------------
