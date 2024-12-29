@@ -80,7 +80,7 @@ MODULE DB
 
     SUBROUTINE PQclear(result) BIND(C, NAME="PQclear")
       IMPORT :: C_PTR
-      TYPE(C_PTR), INTENT(IN) :: result
+      TYPE(C_PTR), VALUE :: result
     END SUBROUTINE PQclear
 
     FUNCTION PQgetvalue(res, tupno, field) BIND(C, NAME="PQgetvalue")
