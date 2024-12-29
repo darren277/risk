@@ -287,95 +287,101 @@ CONTAINS
 
     CHARACTER(*), INTENT(IN)  :: requestBuffer
     CHARACTER(*), INTENT(OUT) :: response
-    CHARACTER(LEN=1024) :: normalizedBuffer
-
+    CHARACTER(LEN=:), ALLOCATABLE :: normalizedBuffer
+    
     CHARACTER(LEN=8)  :: method
     CHARACTER(LEN=256) :: path
-    CHARACTER(LEN=16)  :: httpVersion  ! e.g. "HTTP/1.1"
+    CHARACTER(LEN=16)  :: httpVersion
     CHARACTER(LEN=:), ALLOCATABLE :: rawBody
-    CHARACTER(LEN=512) :: body
-    CHARACTER(LEN=1024) :: requestLine
-    INTEGER :: iLineEnd, iBlankLine, ios
+    CHARACTER(LEN=16) :: contentLengthStr
+    INTEGER :: iLineEnd, iBlankLine, contentLength, ios
+    INTEGER :: requestLen, bufferLen, i
 
     ! Initialize variables
     method = 'UNKNOWN'
     path = '/'
     httpVersion = ''
-    body = ''
-    ALLOCATE(character(LEN=0) :: rawBody)
+    contentLength = 0
+    
+    WRITE(*, '(A)') "[DEBUG] Starting request parsing"
+    
+    ! Calculate buffer size
+    requestLen = LEN_TRIM(requestBuffer)
+    bufferLen = requestLen
+    DO i = 1, requestLen
+        IF (requestBuffer(i:i) == CHAR(13)) bufferLen = bufferLen + 1
+    END DO
+    
+    WRITE(*, '(A,I0)') "[DEBUG] Request length: ", requestLen
+    WRITE(*, '(A,I0)') "[DEBUG] Allocated buffer length: ", bufferLen
+    
+    ALLOCATE(CHARACTER(LEN=bufferLen) :: normalizedBuffer)
 
-    !----------------------------------------------------------------------------
-    ! Normalize line endings to handle CRLF (`\r\n`) and LF (`\n`) consistently
-    !----------------------------------------------------------------------------
-    CALL replace(requestBuffer, CHAR(13)//NEW_LINE('A'), NEW_LINE('A'), normalizedBuffer)
+    ! Safe normalization with bounds checking
+    CALL safeReplace(requestBuffer(1:requestLen), CHAR(13)//NEW_LINE('A'), &
+                    NEW_LINE('A'), normalizedBuffer)
+    
+    WRITE(*, '(A)') "[DEBUG] Normalized buffer: "//TRIM(normalizedBuffer)
 
-    ! Log normalized request buffer
-    WRITE(*, '(A)') "[DEBUG] Raw Request Buffer (After Normalization):"
-    WRITE(*, '(A)') TRIM(normalizedBuffer)
-
-    !----------------------------------------------------------------------------
-    ! 1) Find the first newline to isolate the request line, e.g. "POST /loans HTTP/1.1"
-    !----------------------------------------------------------------------------
+    ! Parse request line with bounds checking
     iLineEnd = INDEX(normalizedBuffer, NEW_LINE('A'))
-    IF (iLineEnd <= 0) THEN
-      ! No newline at all => invalid or incomplete request
-      WRITE(*, '(A)') "[DEBUG] Invalid or incomplete request received:"
-      WRITE(*, '(A)') TRIM(normalizedBuffer)
-      RETURN
-    ELSE
-      ! Extract the request line (up to but excluding the newline)
-      requestLine = TRIM(normalizedBuffer(1:iLineEnd-1))
+    IF (iLineEnd <= 0 .OR. iLineEnd > bufferLen) THEN
+        WRITE(*, '(A)') "[DEBUG] Invalid request line ending"
+        response = "HTTP/1.1 400 Bad Request"//NEW_LINE('A')
+        GOTO 100
+    END IF
+    
+    WRITE(*, '(A,I0)') "[DEBUG] Request line end at: ", iLineEnd
 
-      ! Parse method, path, and HTTP version
-      CALL parseRequestLine(requestLine, method, path, httpVersion)
+    CALL safeParseRequestLine(normalizedBuffer(1:iLineEnd-1), method, path, httpVersion)
+    WRITE(*, '(A)') "[DEBUG] Parsed method: "//TRIM(method)
+    WRITE(*, '(A)') "[DEBUG] Parsed path: "//TRIM(path)
+    WRITE(*, '(A)') "[DEBUG] Parsed version: "//TRIM(httpVersion)
+
+    IF (method == 'UNKNOWN') THEN
+        WRITE(*, '(A)') "[DEBUG] Unknown method"
+        response = "HTTP/1.1 405 Method Not Allowed"//NEW_LINE('A')
+        GOTO 100
     END IF
 
-    ! Log the parsed request line
-    WRITE(*, '(A)') "[DEBUG] Request Line Parsed:"
-    WRITE(*, '(A)') "  Method: " // TRIM(method)
-    WRITE(*, '(A)') "  Path: " // TRIM(path)
-    WRITE(*, '(A)') "  HTTP Version: " // TRIM(httpVersion)
-
-    !----------------------------------------------------------------------------
-    ! 2) Find the blank line that signals the end of headers
-    !----------------------------------------------------------------------------
+    ! Find blank line with validation
     iBlankLine = INDEX(normalizedBuffer(iLineEnd+1:), NEW_LINE('A')//NEW_LINE('A'))
     IF (iBlankLine > 0) THEN
-      iBlankLine = iBlankLine + iLineEnd  ! Adjust position relative to the full string
+        iBlankLine = iBlankLine + iLineEnd
+        WRITE(*, '(A,I0)') "[DEBUG] Blank line found at: ", iBlankLine
+    ELSE
+        WRITE(*, '(A)') "[DEBUG] No blank line found"
+        response = "HTTP/1.1 400 Bad Request"//NEW_LINE('A')
+        GOTO 100
+    END IF
 
-      ! Check if body exists and is within bounds
-      IF (ALLOCATED(rawBody)) DEALLOCATE(rawBody)
-      IF (iBlankLine+2 <= LEN(normalizedBuffer)) THEN
-        ALLOCATE(character(LEN=(LEN(normalizedBuffer)-(iBlankLine+1))) :: rawBody)
-        rawBody = normalizedBuffer(iBlankLine+2:)
-      ELSE
-        ALLOCATE(character(LEN=0) :: rawBody)
+    ! Safe header parsing
+    CALL safeExtractHeaderValue(normalizedBuffer(1:iBlankLine), "Content-Length", contentLengthStr)
+    READ(contentLengthStr, *, IOSTAT=ios) contentLength
+    IF (ios /= 0) contentLength = 0
+    WRITE(*, '(A,I0)') "[DEBUG] Content length: ", contentLength
+
+    ! Safer body handling
+    IF (contentLength > 0 .AND. contentLength <= bufferLen - iBlankLine - 1) THEN
+        ALLOCATE(CHARACTER(LEN=contentLength) :: rawBody)
+        rawBody = normalizedBuffer(iBlankLine+2:iBlankLine+1+contentLength)
+        WRITE(*, '(A,I0)') "[DEBUG] Body length: ", LEN(rawBody)
+        WRITE(*, '(A)') "[DEBUG] Body content: "//TRIM(rawBody)
+    ELSE
+        WRITE(*, '(A)') "[DEBUG] No body or invalid length"
+        ALLOCATE(CHARACTER(LEN=0) :: rawBody)
         rawBody = ''
-      END IF
-    ELSE
-      ! No blank line found; log this and handle as an invalid request
-      WRITE(*, '(A)') "[DEBUG] No blank line found after headers. Request may be malformed."
-      rawBody = ''  ! Set body to empty
-      RETURN
     END IF
 
-    !----------------------------------------------------------------------------
-    ! Log request body for debugging
-    !----------------------------------------------------------------------------
-    IF (LEN_TRIM(rawBody) > 0) THEN
-      WRITE(*, '(A)') "[DEBUG] Request Body:"
-      WRITE(*, '(A)') TRIM(rawBody)
-    ELSE
-      WRITE(*, '(A)') "[DEBUG] No body found in request."
-    END IF
+    ! Route request
+    WRITE(*, '(A)') "[DEBUG] Routing request"
+    CALL routeRequest(TRIM(method), TRIM(path), rawBody, response)
 
-    !----------------------------------------------------------------------------
-    ! 3) Dispatch to your Router
-    !----------------------------------------------------------------------------
-    CALL routeRequest(TRIM(method), TRIM(path), TRIM(rawBody), response)
+    100 CONTINUE  ! Cleanup
+        WRITE(*, '(A)') "[DEBUG] Cleaning up"
+        IF (ALLOCATED(normalizedBuffer)) DEALLOCATE(normalizedBuffer)
+        IF (ALLOCATED(rawBody)) DEALLOCATE(rawBody)
 
-    ! Clean up
-    IF (ALLOCATED(rawBody)) DEALLOCATE(rawBody)
   END SUBROUTINE parseAndRoute
 
 END MODULE HTTPServer
