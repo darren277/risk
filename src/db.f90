@@ -191,7 +191,60 @@ CONTAINS
        rvalue = 0.0D0
     END IF
   END FUNCTION cPtrToDouble
+  SUBROUTINE debugPGresult(status)
+    USE ISO_C_BINDING
+    IMPLICIT NONE
+    INTEGER(C_INT), INTENT(IN) :: status
+    
+    SELECT CASE (status)
+        CASE (PGRES_EMPTY_QUERY)
+            WRITE(*, '(A)') "[DEBUG] Status: EMPTY_QUERY"
+        CASE (PGRES_COMMAND_OK) 
+            WRITE(*, '(A)') "[DEBUG] Status: COMMAND_OK"
+        CASE (PGRES_TUPLES_OK)
+            WRITE(*, '(A)') "[DEBUG] Status: TUPLES_OK"
+        CASE (PGRES_BAD_RESPONSE)
+            WRITE(*, '(A)') "[DEBUG] Status: BAD_RESPONSE"
+        CASE (PGRES_FATAL_ERROR)
+            WRITE(*, '(A)') "[DEBUG] Status: FATAL_ERROR"
+        CASE DEFAULT
+            WRITE(*, '(A,I0)') "[DEBUG] Status: UNKNOWN (", status, ")"
+    END SELECT
+  END SUBROUTINE
 
+  SUBROUTINE handlePGresult(resPtr, connPtr, errmsg, outId)
+    USE ISO_C_BINDING
+    IMPLICIT NONE
+    TYPE(C_PTR), INTENT(IN) :: resPtr, connPtr
+    CHARACTER(*), INTENT(OUT) :: errmsg
+    INTEGER, INTENT(OUT) :: outId
+    INTEGER(C_INT) :: status
+
+    IF (.NOT. C_ASSOCIATED(resPtr)) THEN
+        WRITE(*, '(A)') "[DEBUG] Result pointer is NULL!"
+        CALL getErrorMessage(connPtr, errmsg)
+        outId = -1
+        RETURN
+    END IF
+
+    status = PQresultStatus(resPtr)
+    WRITE(*, '(A,Z0)') "[DEBUG] Raw status (hex): ", status  ! Show hex value
+    WRITE(*, '(A,I0)') "[DEBUG] Raw status (int): ", status
+
+    ! Also check resPtr
+    WRITE(*, '(A,Z0)') "[DEBUG] Result pointer value: ", TRANSFER(resPtr, 0_C_INTPTR_T)
+    
+    CALL debugPGresult(status)
+
+    IF (status /= PGRES_TUPLES_OK) THEN
+        CALL getErrorMessage(connPtr, errmsg)
+        WRITE(*,*) 'Failed to insert loan: ', TRIM(errmsg)
+        outId = -1
+        CALL PQclear(resPtr)
+        RETURN
+    END IF
+  END SUBROUTINE
+  
   ! ------------------------------------------------------------------
   ! 5) Helper: get libpq error message into Fortran string
   ! ------------------------------------------------------------------
